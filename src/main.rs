@@ -42,18 +42,60 @@ uniform uint uWidth;
 uniform uint uHeight;
 uniform float uTime;
 uniform layout(binding=3, rgba8ui) writeonly uimage2D uSourceTexture;
+
+struct Ray {
+    vec3 origin;
+    vec3 direction;
+};
+
+vec3 ray_at(Ray r, float t) {
+    return r.origin + t * r.direction;
+}
+
+float hit_sphere(vec3 center, float radius, Ray r) {
+    vec3 oc = r.origin - center;
+    float a = dot(r.direction, r.direction);
+    float half_b = dot(oc, r.direction);
+    float c = dot(oc, oc) - radius*radius;
+    float discriminant = half_b*half_b - a*c;
+
+    if (discriminant < 0) {
+        return -1.0;
+    } else {
+        return (-half_b - sqrt(discriminant) ) / a;
+    }
+}
+
+vec3 ray_color(Ray r) {
+    float t = hit_sphere(vec3(0,0,-1), 0.5, r) ;
+    if (t > 0.0) {
+        vec3 N = normalize(ray_at(r, t) - vec3(0,0,-1));
+        return 0.5*vec3(N.x+1, N.y+1, N.z+1);
+    }
+    vec3 unit_direction = normalize(r.direction);
+    t = 0.5*(unit_direction.y + 1.0);
+    return (1.0-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
+}
+
 void main() {
   ivec2 i = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y);
   vec2 uv = vec2(i) * vec2(1.0 / float(uWidth), 1.0 / float(uHeight));
 
-  // perform path tracing
-  
-  const int M =128;
-  for (int i = 0; i<M; i++) { }
+  float aspect_ratio = 16.0 / 9.0;
 
-  vec4 color = vec4(1, 0, 0, 1);
+  float viewport_height = 2.0;
+  float viewport_width = aspect_ratio * viewport_height;
+  float focal_length = 1.0;
 
-  imageStore(uSourceTexture, i , uvec4(color * 255.0f));
+  vec3 origin = vec3(0, 0, 0);
+  vec3 horizontal = vec3(viewport_width, 0, 0);
+  vec3 vertical = vec3(0, viewport_height, 0);
+  vec3 lower_left_corner = origin - horizontal/2 - vertical/2 - vec3(0, 0, focal_length);
+
+  Ray r = Ray(origin, lower_left_corner + uv.x*horizontal + uv.y*vertical - origin);
+  vec4 pixel_color = vec4(ray_color(r), 1);
+
+  imageStore(uSourceTexture, i , uvec4(pixel_color * 255.0f));
 }
     "#).unwrap();
 
